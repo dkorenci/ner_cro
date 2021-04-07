@@ -9,13 +9,13 @@ from pathlib import Path
 hr500k_path = '/data/resources/cro.lang.resources/hr500k.conll/hr500k.conll'
 hr500k_trunc_path = '/data/resources/cro.lang.resources/hr500k.conll/hr500k.trunc.conll'
 
-def scann_hr500k(path=hr500k_path):
+def analyze_hr500k(path=hr500k_path):
     '''
-    Analyze properties of the records in hr500k,
-    that have more than standard 10 CoNLL-U fields.
+    Print properties of the data hr500k
     '''
     numfields = set(); # numbers of fields per record
     maxnes = set() # indexes of maximum non-empty fields
+    nertags = set() # NER token tags
     for line in open(path, 'r').readlines():
         l = line.strip()
         if l.startswith('#') or l == '': # comment or empty line
@@ -24,8 +24,11 @@ def scann_hr500k(path=hr500k_path):
             fields = l.split('\t')
             maxne = max(i for i, f in enumerate(fields) if f != '_')
             numfields.add(len(fields)); maxnes.add(maxne)
-    print(numfields)
-    print(maxnes)
+            nertags.add(fields[10])
+    print(f'field lengths: {numfields}')
+    print(f'non-empty fields: {maxnes}')
+    nertags = sorted(nertags, key=lambda tag:tag[::-1])
+    print(f'ner tages: {nertags}')
 
 def trunc_hr500k(inpath=hr500k_path, outpath=hr500k_trunc_path):
     '''
@@ -111,6 +114,6 @@ def create_spacy_corpus(inpath=hr500k_path, outpath='corpus',
         print(f'{name} done.')
 
 if __name__ == '__main__':
-    #scann_hr500k()
+    analyze_hr500k()
     #trunc_hr500k()
-    create_spacy_corpus()
+    #create_spacy_corpus()
