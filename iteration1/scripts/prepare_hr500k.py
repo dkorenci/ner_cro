@@ -113,7 +113,26 @@ def create_spacy_corpus(inpath=hr500k_path, outpath='corpus',
         docbin.to_disk(outpath / f'{name}.spacy')
         print(f'{name} done.')
 
+def analyze_spacy_corpus(path, ssize=10, rseed=88103):
+    from random import seed, sample
+    from spacy import Vocab
+    docbin = DocBin(); docbin.from_disk(path)
+    #vocab = Vocab().from_disk(Path(path).parents[0] / 'spacy_vocab')
+    nlp = spacy.blank("hr")
+    docs = [d for d in docbin.get_docs(nlp.vocab)]
+    if ssize and ssize > 0 and ssize < len(docs):
+        seed(rseed)
+        docs = sample(docs, ssize)
+    for doc in docs:
+        print(doc.text)
+        print(doc.has_annotation('POS'))
+        for tok in doc:
+            print(tok.text, tok.ent_type_)
+            #print(vocab[tok.pos])
+        print()
+
 if __name__ == '__main__':
-    analyze_hr500k()
+    #analyze_hr500k()
     #trunc_hr500k()
-    #create_spacy_corpus()
+    create_spacy_corpus()
+    #analyze_spacy_corpus('corpus/dev.spacy', ssize=4)
