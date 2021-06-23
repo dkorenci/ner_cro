@@ -41,18 +41,19 @@ class BilstmTagger(TrainablePipe):
         nlp: Language = None,
         labels: Optional[List[str]] = None,
     ):
+        from scripts.nercro_utils import add_iob_labels, create_label_map
         L.info('bilstm.initialize')
         # extract ner labels
+        labels = set()
         for i, ex in enumerate(get_examples()):
-            if i == 10: break
+            add_iob_labels(ex.reference, labels)
             #L.info(f'doc: {ex.reference}')
             #for ent in ex.reference.ents:
-            #    L.info(f'{ent}, {ent.label_}')
-            #for tok in ex.reference:
-            #    L.info(f'token: {tok}, iob: {tok.ent_iob_}, type: {tok.ent_type_}')
-        # init labels
-        # label == iob + type (lowercased?)
-        # init model (output size)
+            #   L.info(f'{ent}, {ent.label_}')
+        self._labels = labels
+        self._label_map = create_label_map(labels)
+        L.info(self._labels)
+        L.info(self._label_map)
 
     def predict(self, docs, Doc=None):
         scores = self.model.predict(docs)
