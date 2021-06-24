@@ -8,7 +8,9 @@ from spacy.pipeline import TrainablePipe
 from spacy.language import Language
 from spacy.training.example import Example
 from spacy.vocab import Vocab
+from spacy.tokens.doc import Doc
 from thinc.model import Model
+from thinc.types import Floats2d
 
 from scripts.nercro_utils import logger as L
 
@@ -55,7 +57,7 @@ class BilstmTagger(TrainablePipe):
         L.info(self._labels)
         L.info(self._label_map)
 
-    def predict(self, docs, Doc=None):
+    def predict(self, docs: Iterable[Doc]) -> Floats2d:
         scores = self.model.predict(docs)
         return self.model.ops.asarray(scores)
 
