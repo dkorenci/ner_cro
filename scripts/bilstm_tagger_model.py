@@ -6,7 +6,7 @@ import spacy
 from typing import List
 
 from thinc.api import Model, chain, TensorFlowWrapper, PyTorchLSTM
-from thinc.layers import list2padded, padded2list, with_padded, Softmax, with_list
+from thinc.layers import list2padded, list2array, with_padded, Softmax, with_list
 from thinc.api import strings2arrays, with_array
 
 from spacy.ml import CharacterEmbed
@@ -68,7 +68,7 @@ def thinc_bilstm_torch(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: in
     '''
     bilstm = PyTorchLSTM(nO=lstm_width*2, nI=emb_width, bi=True, depth=num_layers)
     classification = Softmax(nO=num_labels, nI=lstm_width)
-    model = chain(tok2vec, with_padded(bilstm), classification)
+    model = chain(tok2vec, with_padded(bilstm), with_array(classification))
     return model
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ Implements BiLSTM sequence tagger as spaCy pipeline component.
 '''
 
 from typing import Tuple, List, Iterable, Optional, Dict, Callable, Any
+import numpy as np
 
 from spacy.pipeline import TrainablePipe
 from spacy.language import Language
@@ -13,6 +14,7 @@ from thinc.model import Model
 from thinc.types import Floats2d
 
 from scripts.nercro_utils import logger as L
+from scripts.nercro_utils import add_iob_labels, create_label_map, token_iob_label
 
 @Language.factory("bilstm_tagger")
 def bilstm_tagger(nlp, name, model):
@@ -37,25 +39,22 @@ class BilstmTagger(TrainablePipe):
     def labels(self) -> Tuple[str]:
         return tuple(self.cfg["labels"])
 
-    def initialize(self,
-        get_examples: Callable[[], Iterable[Example]],
-        *,
-        nlp: Language = None,
-        labels: Optional[List[str]] = None,
-    ):
-        from scripts.nercro_utils import add_iob_labels, create_label_map
+    def initialize(self, get_examples: Callable[[], Iterable[Example]], *,
+            nlp: Language = None, labels: Optional[List[str]] = None):
+        from itertools import islice
         L.info('bilstm.initialize')
         # extract ner labels
         labels = set()
         for i, ex in enumerate(get_examples()):
             add_iob_labels(ex.reference, labels)
-            #L.info(f'doc: {ex.reference}')
-            #for ent in ex.reference.ents:
-            #   L.info(f'{ent}, {ent.label_}')
         self._labels = labels
         self._label_map = create_label_map(labels)
         L.info(self._labels)
         L.info(self._label_map)
+        sample = list(islice(get_examples(), 10))
+        docsample = [ex.reference for ex in sample]
+        labels = self._examples_to_ner_labels(sample)
+        self.model.initialize(X=docsample, Y=labels)
 
     def predict(self, docs: Iterable[Doc]) -> Floats2d:
         scores = self.model.predict(docs)
@@ -64,3 +63,29 @@ class BilstmTagger(TrainablePipe):
     def set_annotations(self, docs, Doc=None, *args, **kwargs):
         print('bilstm.set_annotations')
         pass
+
+    def get_loss(self, examples: Iterable[Example], scores) -> Tuple[float, float]:
+        from thinc.api import CategoricalCrossentropy
+        loss_calc = CategoricalCrossentropy()
+        truth = self._examples_to_ner_labels(examples)
+        scores_flat = self.model.ops.flatten(scores)
+        L.info(f'truth.shape {truth.shape}')
+        L.info(f'scores.shape {scores_flat.shape}')
+        return loss_calc(scores_flat, truth)
+
+    def _examples_to_ner_labels(self, examples: List[Example]) -> Optional[np.ndarray]:
+        '''
+        Convert reference documents in the examples to matrix of one-hot NER labels
+        '''
+        if len(examples) == 0: return None
+        labels = [self._document_ner_labels(ex.reference) for ex in examples]
+        return np.concatenate(labels)
+
+    def _document_ner_labels(self, doc:Doc) -> Optional[np.ndarray]:
+        '''
+        Convert a document with NER annotations into a matrix of one-hot per-token labels
+        '''
+        labels = np.zeros((len(doc), len(self._labels)), float)
+        for i, tok in enumerate(doc):
+            labels[i, self._label_map[token_iob_label(tok)]] = 1.0
+        return labels
