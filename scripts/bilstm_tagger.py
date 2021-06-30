@@ -13,8 +13,7 @@ from spacy.tokens.doc import Doc
 from thinc.model import Model
 from thinc.types import Floats2d
 
-from scripts.nercro_utils import logger as L
-from scripts.nercro_utils import add_iob_labels, create_label_map, token_iob_label
+from scripts.nercro_utils import *
 
 @Language.factory("bilstm_tagger")
 def bilstm_tagger(nlp, name, model):
@@ -57,11 +56,12 @@ class BilstmTagger(TrainablePipe):
         self.model.initialize(X=docsample, Y=labels)
 
     def predict(self, docs: Iterable[Doc]) -> Floats2d:
+        L.info('predict')
         scores = self.model.predict(docs)
         return self.model.ops.asarray(scores)
 
     def set_annotations(self, docs, Doc=None, *args, **kwargs):
-        print('bilstm.set_annotations')
+        L.info('set_annotations')
         pass
 
     def get_loss(self, examples: Iterable[Example], scores) -> Tuple[float, float]:
@@ -86,10 +86,7 @@ class BilstmTagger(TrainablePipe):
         '''
         Convert a document with NER annotations into a matrix of one-hot per-token labels
         '''
-        if debug:
-            L.info(f'doc.length: {len(doc)}')
-            L.info(f'doc text: {str(doc)}')
-            L.info(f'doc tokens:[{";".join([str(tok) for tok in doc])}]')
+        if debug: print_doc_info(doc)
         labels = np.zeros((len(doc), len(self._labels)), float)
         for i, tok in enumerate(doc):
             labels[i, self._label_map[token_iob_label(tok)]] = 1.0

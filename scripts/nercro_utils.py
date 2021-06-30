@@ -1,7 +1,7 @@
 import logging
 from spacy.tokens import Token, Doc
 
-logger = logging.getLogger("spacy")
+L = logging.getLogger("spacy")
 
 def add_iob_labels(doc:Doc, labels = None):
     '''
@@ -28,12 +28,19 @@ def create_label_map(labels):
     '''
     return {l:i for i, l in enumerate(sorted(labels))}
 
+def print_doc_info(doc: Doc):
+    L.info(f'doc.length: {len(doc)}')
+    L.info(f'doc text: {str(doc)}')
+    L.info(f'doc tokens:[{"|".join([str(tok) for tok in doc])}]')
+
 def model_debug_fw(model, X, Y):
     '''
     Forward callback for the thinc model debug logger.     
     '''
-    logger.info(f"Model.name: {model.name})")
-    logger.info(f"Input - length: {len(X)}, type: {type(X)}")
+    L.info(f"Model.name: {model.name})")
+    L.info(f"Input - length: {len(X)}, type: {type(X)}")
     for e in X:
-        logger.info(f"  element - length: {len(e)}, type: {type(e)}")
+        if isinstance(e, Doc): print_doc_info(e)
+        else: # generic element info
+            L.info(f"  element - length: {len(e)}, type: {type(e)}")
 

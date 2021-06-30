@@ -16,7 +16,7 @@ from thinc.types import Floats2d
 from tensorflow import keras
 from tensorflow.keras import layers
 
-from scripts.nercro_utils import logger as L, model_debug_fw
+from scripts.nercro_utils import L as L, model_debug_fw
 
 
 # https://spacy.io/usage/processing-pipelines#trainable-components
