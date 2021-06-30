@@ -67,24 +67,29 @@ class BilstmTagger(TrainablePipe):
     def get_loss(self, examples: Iterable[Example], scores) -> Tuple[float, float]:
         from thinc.api import CategoricalCrossentropy
         loss_calc = CategoricalCrossentropy()
-        truth = self._examples_to_ner_labels(examples)
+        truth = self._examples_to_ner_labels(examples, debug=True)
         scores_flat = self.model.ops.flatten(scores)
         L.info(f'truth.shape {truth.shape}')
         L.info(f'scores.shape {scores_flat.shape}')
         return loss_calc(scores_flat, truth)
 
-    def _examples_to_ner_labels(self, examples: List[Example]) -> Optional[np.ndarray]:
+    def _examples_to_ner_labels(self, examples: List[Example], debug:bool = False) \
+            -> Optional[np.ndarray]:
         '''
         Convert reference documents in the examples to matrix of one-hot NER labels
         '''
         if len(examples) == 0: return None
-        labels = [self._document_ner_labels(ex.reference) for ex in examples]
+        labels = [self._document_ner_labels(ex.reference, debug) for ex in examples]
         return np.concatenate(labels)
 
-    def _document_ner_labels(self, doc:Doc) -> Optional[np.ndarray]:
+    def _document_ner_labels(self, doc:Doc, debug:bool = False) -> Optional[np.ndarray]:
         '''
         Convert a document with NER annotations into a matrix of one-hot per-token labels
         '''
+        if debug:
+            L.info(f'doc.length: {len(doc)}')
+            L.info(f'doc text: {str(doc)}')
+            L.info(f'doc tokens:[{";".join([str(tok) for tok in doc])}]')
         labels = np.zeros((len(doc), len(self._labels)), float)
         for i, tok in enumerate(doc):
             labels[i, self._label_map[token_iob_label(tok)]] = 1.0

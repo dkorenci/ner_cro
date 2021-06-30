@@ -28,3 +28,12 @@ def create_label_map(labels):
     '''
     return {l:i for i, l in enumerate(sorted(labels))}
 
+def model_debug_fw(model, X, Y):
+    '''
+    Forward callback for the thinc model debug logger.     
+    '''
+    logger.info(f"Model.name: {model.name})")
+    logger.info(f"Input - length: {len(X)}, type: {type(X)}")
+    for e in X:
+        logger.info(f"  element - length: {len(e)}, type: {type(e)}")
+

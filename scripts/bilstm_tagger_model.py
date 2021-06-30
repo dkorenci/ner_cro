@@ -6,7 +6,7 @@ import spacy
 from typing import List
 
 from thinc.api import Model, chain, TensorFlowWrapper, PyTorchLSTM
-from thinc.layers import list2padded, list2array, with_padded, Softmax, with_list
+from thinc.layers import list2padded, list2array, with_padded, Softmax, with_list, with_debug
 from thinc.api import strings2arrays, with_array
 
 from spacy.ml import CharacterEmbed
@@ -16,7 +16,7 @@ from thinc.types import Floats2d
 from tensorflow import keras
 from tensorflow.keras import layers
 
-from scripts.nercro_utils import logger as L
+from scripts.nercro_utils import logger as L, model_debug_fw
 
 
 # https://spacy.io/usage/processing-pipelines#trainable-components
@@ -24,7 +24,7 @@ from scripts.nercro_utils import logger as L
 def build_model(tok2vec: Model[List[Doc], List[Floats2d]], layers, num_labels, emb_width, lstm_width) \
         -> Model[List[Doc], List[Floats2d]]:
     return thinc_bilstm_torch(tok2vec, num_labels=num_labels, emb_width=emb_width,
-                              lstm_width=lstm_width, num_layers=layers)
+                              lstm_width=lstm_width, num_layers=layers, debug=True)
 
 def tf_bilstm_model1(num_labels, emb_size = 128, state_size = 32, num_layers = 2):
     # https://keras.io/examples/nlp/bidirectional_lstm_imdb/
@@ -60,7 +60,7 @@ def thinc_bilstm_tf(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: int,
     return model
 
 def thinc_bilstm_torch(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: int, emb_width:int,
-                       lstm_width: int = 64, num_layers: int = 2) \
+                       lstm_width: int = 64, num_layers: int = 2, debug:bool = False) \
     -> Model[List[Doc], List[Floats2d]]:
     '''
     Create a BiLSTM model based on pyTorch implementation
@@ -68,7 +68,12 @@ def thinc_bilstm_torch(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: in
     '''
     bilstm = PyTorchLSTM(nO=lstm_width*2, nI=emb_width, bi=True, depth=num_layers)
     classification = Softmax(nO=num_labels, nI=lstm_width)
-    model = chain(tok2vec, with_padded(bilstm), with_array(classification))
+    if debug:
+        model = chain(with_debug(tok2vec, on_forward=model_debug_fw),
+                  with_debug(bilstm, on_forward=model_debug_fw),
+                  with_debug(with_array(classification), on_forward=model_debug_fw))
+    else:
+        model = chain(tok2vec, bilstm, with_array(classification))
     return model
 
 if __name__ == '__main__':
