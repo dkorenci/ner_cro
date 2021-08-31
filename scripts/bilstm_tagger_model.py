@@ -22,9 +22,10 @@ from scripts.nercro_utils import L as L, model_debug_fw
 # https://spacy.io/usage/processing-pipelines#trainable-components
 @spacy.registry.architectures("bilstm.model.v1")
 def build_model(tok2vec: Model[List[Doc], List[Floats2d]], layers, num_labels, emb_width, lstm_width) \
-        -> Model[List[Doc], List[Floats2d]]:
+        -> Model[List[Doc], Floats2d]:
+        #-> Model[List[Doc], List[Floats2d]]:
     return thinc_bilstm_torch(tok2vec, num_labels=num_labels, emb_width=emb_width,
-                              lstm_width=lstm_width, num_layers=layers, debug=True)
+                              lstm_width=lstm_width, num_layers=layers, debug=False)
 
 def tf_bilstm_model1(num_labels, emb_size = 128, state_size = 32, num_layers = 2):
     # https://keras.io/examples/nlp/bidirectional_lstm_imdb/
@@ -61,19 +62,22 @@ def thinc_bilstm_tf(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: int,
 
 def thinc_bilstm_torch(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: int, emb_width:int,
                        lstm_width: int = 64, num_layers: int = 2, debug:bool = False) \
-    -> Model[List[Doc], List[Floats2d]]:
+    -> Model[List[Doc], Floats2d]:
+    #-> Model[List[Doc], List[Floats2d]]:
     '''
     Create a BiLSTM model based on pyTorch implementation
     :return:
     '''
-    bilstm = PyTorchLSTM(nO=lstm_width*2, nI=emb_width, bi=True, depth=num_layers)
+    #TODO: init weights, for Softmax?, for LSTM?
+    bilstm = PyTorchLSTM(nO=lstm_width, nI=emb_width, bi=True, depth=num_layers)
     classification = Softmax(nO=num_labels, nI=lstm_width)
     if debug:
         model = chain(with_debug(tok2vec, on_forward=model_debug_fw),
                   with_debug(bilstm, on_forward=model_debug_fw),
                   with_debug(with_array(classification), on_forward=model_debug_fw))
     else:
-        model = chain(tok2vec, bilstm, with_array(classification))
+        model = chain(tok2vec, bilstm, with_array(classification), list2array())
+        #model = chain(tok2vec, bilstm, classification)
     return model
 
 if __name__ == '__main__':

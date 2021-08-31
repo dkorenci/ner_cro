@@ -1,7 +1,19 @@
 import logging
 from spacy.tokens import Token, Doc
+from spacy.training import Example
 
 L = logging.getLogger("spacy")
+
+def add_ner_labels(ex:Example, labels = None):
+    '''
+    Add aligned NER labels of the training example to the label set.
+    ex.get_aligned_ner() determines the nature of the labels
+    :param labels: set of string labels
+    :return:
+    '''
+    if labels is None: labels = set()
+    for l in ex.get_aligned_ner(): labels.add(l)
+    return labels
 
 def add_iob_labels(doc:Doc, labels = None):
     '''

@@ -45,7 +45,8 @@ class BilstmTagger(TrainablePipe):
         # extract ner labels
         labels = set()
         for i, ex in enumerate(get_examples()):
-            add_iob_labels(ex.reference, labels)
+            #add_iob_labels(ex.reference, labels)
+            add_ner_labels(ex, labels)
         self._labels = labels
         self._label_map = create_label_map(labels)
         L.info(self._labels)
@@ -66,12 +67,29 @@ class BilstmTagger(TrainablePipe):
 
     def get_loss(self, examples: Iterable[Example], scores) -> Tuple[float, float]:
         from thinc.api import CategoricalCrossentropy
+        for ex in examples:
+            iobtags = [tag if tag is not "" else None
+                     for tag in ex.get_aligned("ENT_IOB", as_string=True)]
+            L.info(iobtags)
+            L.info(len(iobtags))
+            enttags = [tag if tag is not "" else None
+                     for tag in ex.get_aligned("ENT_TYPE", as_string=True)]
+            L.info(enttags)
+            L.info(len(enttags))
         loss_calc = CategoricalCrossentropy()
-        truth = self._examples_to_ner_labels(examples, debug=True)
-        scores_flat = self.model.ops.flatten(scores)
+        truth = self._examples_to_ner_labels(examples, debug=False)
+        L.info(f'scores.type {type(scores)} scores.elem.type {type(scores[0])}') #scores.shape {scores.shape}')
+        #scores_flat = self.model.ops.flatten(scores)
+        scores_flat = scores
+        L.info(f'truth:\n{truth}')
+        L.info(f'scores:\n{scores_flat}')
+        grad, loss = loss_calc(scores_flat, truth)
+        #grad = scores_flat - truth
         L.info(f'truth.shape {truth.shape}')
-        L.info(f'scores.shape {scores_flat.shape}')
-        return loss_calc(scores_flat, truth)
+        L.info(f'scores_flat.shape {scores_flat.shape}')
+        L.info(f'loss.type {type(loss)} loss {loss} ')
+        L.info(f'grad.type {type(grad)} grad.shape {grad.shape} grad {grad} ')
+        return float(loss), grad
 
     def _examples_to_ner_labels(self, examples: List[Example], debug:bool = False) \
             -> Optional[np.ndarray]:
@@ -79,8 +97,25 @@ class BilstmTagger(TrainablePipe):
         Convert reference documents in the examples to matrix of one-hot NER labels
         '''
         if len(examples) == 0: return None
-        labels = [self._document_ner_labels(ex.reference, debug) for ex in examples]
+        #labels = [self._document_ner_labels(ex.reference, debug) for ex in examples]
+        labels = [self._example_ner_labels_aligned(ex, debug) for ex in examples]
         return np.concatenate(labels)
+
+    def _example_ner_labels_aligned(self, ex: Example, debug:bool = False) \
+            -> Optional[np.ndarray]:
+        aner = ex.get_aligned_ner()
+        if debug:
+            L.info('aligned ner:')
+            L.info(aner)
+        # without explicitly setting dtype="float32", there is a type mismatch error
+        labels = np.zeros((len(aner), len(self._labels)), dtype="float32")
+        for i, nerLabel in enumerate(ex.get_aligned_ner()):
+            labels[i, self._label_map[nerLabel]] = 1.0
+        #doc = ex.reference
+        #labels = np.zeros((len(doc), len(self._labels)), float)
+        #for i, tok in enumerate(doc):
+        #    labels[i, self._label_map[token_iob_label(tok)]] = 1.0
+        return labels
 
     def _document_ner_labels(self, doc:Doc, debug:bool = False) -> Optional[np.ndarray]:
         '''
