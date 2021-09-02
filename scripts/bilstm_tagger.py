@@ -48,7 +48,7 @@ class BilstmTagger(TrainablePipe):
             #add_iob_labels(ex.reference, labels)
             add_ner_labels(ex, labels)
         self._labels = labels
-        self._label_map = create_label_map(labels)
+        self._label_map, self._inv_label_map = create_label_mappings(labels)
         L.info(self._labels)
         L.info(self._label_map)
         sample = list(islice(get_examples(), 10))
@@ -57,38 +57,40 @@ class BilstmTagger(TrainablePipe):
         self.model.initialize(X=docsample, Y=labels)
 
     def predict(self, docs: Iterable[Doc]) -> Floats2d:
-        L.info('predict')
         scores = self.model.predict(docs)
         return self.model.ops.asarray(scores)
 
-    def set_annotations(self, docs, Doc=None, *args, **kwargs):
+    def set_annotations(self, docs, scores, Doc=None, *args, **kwargs):
+        from spacy.training import biluo_tags_to_spans
         L.info('set_annotations')
-        pass
+        ti = 0 # token index
+        for doc in docs:
+            biluo_tags = []
+            for tok in doc:
+                ner_tag_probs = scores[ti]; ti += 1
+                maxi = np.argmax(ner_tag_probs)
+                ner_label = self._inv_label_map[maxi]
+                biluo_tags.append(ner_label)
+            try:
+                spans = biluo_tags_to_spans(doc, biluo_tags)
+            except ValueError as error:
+                L.info(f'biluo_tags_to_spans error: {error}')
+                spans = []  # fallback to no entities if bilou tags as wrongly formatted
+            try:
+                doc.set_ents(spans)
+            except ValueError as error:
+                L.info(f'doc.set_ents error: {error}')
+                doc.set_ents([]) # fallback to no entities
+            if doc.ents:
+                L.info(f'doc.text: {doc.text}')
+                L.info(f'doc.ents: {doc.ents}')
+                L.info(','.join([t.ent_iob_+('-'+t.ent_type_ if t.ent_type_ else '') for t in doc]))
 
     def get_loss(self, examples: Iterable[Example], scores) -> Tuple[float, float]:
         from thinc.api import CategoricalCrossentropy
-        for ex in examples:
-            iobtags = [tag if tag is not "" else None
-                     for tag in ex.get_aligned("ENT_IOB", as_string=True)]
-            L.info(iobtags)
-            L.info(len(iobtags))
-            enttags = [tag if tag is not "" else None
-                     for tag in ex.get_aligned("ENT_TYPE", as_string=True)]
-            L.info(enttags)
-            L.info(len(enttags))
         loss_calc = CategoricalCrossentropy()
         truth = self._examples_to_ner_labels(examples, debug=False)
-        L.info(f'scores.type {type(scores)} scores.elem.type {type(scores[0])}') #scores.shape {scores.shape}')
-        #scores_flat = self.model.ops.flatten(scores)
-        scores_flat = scores
-        L.info(f'truth:\n{truth}')
-        L.info(f'scores:\n{scores_flat}')
-        grad, loss = loss_calc(scores_flat, truth)
-        #grad = scores_flat - truth
-        L.info(f'truth.shape {truth.shape}')
-        L.info(f'scores_flat.shape {scores_flat.shape}')
-        L.info(f'loss.type {type(loss)} loss {loss} ')
-        L.info(f'grad.type {type(grad)} grad.shape {grad.shape} grad {grad} ')
+        grad, loss = loss_calc(scores, truth)
         return float(loss), grad
 
     def _examples_to_ner_labels(self, examples: List[Example], debug:bool = False) \
@@ -103,6 +105,10 @@ class BilstmTagger(TrainablePipe):
 
     def _example_ner_labels_aligned(self, ex: Example, debug:bool = False) \
             -> Optional[np.ndarray]:
+        '''
+        Convert single example to ground-truth one-hot NER labels, using ex.get_aligned_ner()
+        to get BILOU tags of ex.predicted, aligned to ex.reference
+        '''
         aner = ex.get_aligned_ner()
         if debug:
             L.info('aligned ner:')
@@ -111,10 +117,6 @@ class BilstmTagger(TrainablePipe):
         labels = np.zeros((len(aner), len(self._labels)), dtype="float32")
         for i, nerLabel in enumerate(ex.get_aligned_ner()):
             labels[i, self._label_map[nerLabel]] = 1.0
-        #doc = ex.reference
-        #labels = np.zeros((len(doc), len(self._labels)), float)
-        #for i, tok in enumerate(doc):
-        #    labels[i, self._label_map[token_iob_label(tok)]] = 1.0
         return labels
 
     def _document_ner_labels(self, doc:Doc, debug:bool = False) -> Optional[np.ndarray]:

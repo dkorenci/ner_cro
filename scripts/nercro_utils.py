@@ -32,13 +32,17 @@ def token_iob_label(tok:Token) -> str:
     else: iob_lab = f'{tok.ent_type_}-{tok.ent_iob_}'
     return iob_lab
 
-def create_label_map(labels):
+def create_label_mappings(labels):
     '''
-    Create label by lexicographical sort
+    Index ner labels by lexicographically sorting them,
+     return label->index and index->label maps
     :param labels: set of IOB labels
     :return: map label -> integer index
     '''
-    return {l:i for i, l in enumerate(sorted(labels))}
+    slabels = sorted(labels)
+    l2i = {l:i for i, l in enumerate(slabels)}
+    i2l = {i:l for i, l in enumerate(slabels)}
+    return l2i, i2l
 
 def print_doc_info(doc: Doc):
     L.info(f'doc.length: {len(doc)}')
