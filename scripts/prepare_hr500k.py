@@ -2,7 +2,7 @@
 Prepare the hr500k corpus of annotated sentences to be used by spaCy
 '''
 
-import spacy
+import spacy, sys
 from spacy.tokens import Doc, DocBin
 from pathlib import Path
 
@@ -77,16 +77,16 @@ def read_hr500k(inpath=hr500k_path):
             pos.append(postag); ner.append(nertag)
     return sentences
 
-def create_spacy_corpus(inpath=hr500k_path, outpath='corpus',
+def create_spacy_corpus(corpus_file=hr500k_path, out_folder='corpus',
                         train=0.8, test=0.1, rseed=88103):
     '''
     Create spacy data in DocBin format.
     Create train/dev/test splits according to proportion params.
-    :param outpath: save splits to this folder
+    :param out_folder: save splits to this folder
     '''
     from random import seed, shuffle
     # load data and create splits
-    sents = read_hr500k(inpath)
+    sents = read_hr500k(corpus_file)
     N = len(sents)
     print(f'{N} sentences in total')
     train_sz = int(N*train); test_sz = int(N*test); dev_sz = N - train_sz - test_sz
@@ -98,7 +98,7 @@ def create_spacy_corpus(inpath=hr500k_path, outpath='corpus',
     # save each split as DocBin of individual sentences
     nlp = spacy.blank("hr")
     splits = {'train':train_set, 'dev':dev_set, 'test':test_set}
-    outpath = Path(outpath)
+    out_folder = Path(out_folder)
     for name, sents in splits.items():
         docbin = DocBin()
         print(f'processing {name} ...')
@@ -110,7 +110,7 @@ def create_spacy_corpus(inpath=hr500k_path, outpath='corpus',
                       lemmas=s.lemmas, pos=s.pos, ents=s.ner)
             docbin.add(doc)
             if ((i+1)%1000 == 0): print(f'.. processed {i+1} sentences')
-        docbin.to_disk(outpath / f'{name}.spacy')
+        docbin.to_disk(out_folder / f'{name}.spacy')
         print(f'{name} done.')
 
 def analyze_spacy_corpus(path, ssize=10, rseed=88103):
@@ -134,5 +134,5 @@ def analyze_spacy_corpus(path, ssize=10, rseed=88103):
 if __name__ == '__main__':
     #analyze_hr500k()
     #trunc_hr500k()
-    create_spacy_corpus()
-    #analyze_spacy_corpus('corpus/dev.spacy', ssize=4)
+    # analyze_spacy_corpus('corpus/dev.spacy', ssize=4)
+    create_spacy_corpus(sys.argv[1], sys.argv[2])

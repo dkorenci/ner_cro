@@ -4,6 +4,11 @@ description: "Simple example of downloading and converting source data and train
 # Variables can be referenced across the project.yml using ${vars.var_name}
 vars:
   config: "default-bilstm"
+  # if the url does not work, replace it with the new url of hr500k.conll.zip from:
+  # https://www.clarin.si/repository/xmlui/handle/11356/1183
+  hr500k-url: 'https://www.clarin.si/repository/xmlui/bitstream/handle/11356/1183/hr500k.conll.zip?sequence=6&isAllowed=y'
+  hr500k-archive: 'hr500k.conll.zip'
+  hr500k-file: 'hr500k.conll/hr500k.conll' # location within the archive
   gpu: -1
 
 remotes:
@@ -14,9 +19,8 @@ remotes:
 directories: ["assets", "training", "configs", "metrics", "corpus"]
 
 assets:
-  -
-    dest: "assets/aij-wikiner-en-wp2.bz2"
-    url: "https://raw.githubusercontent.com/dice-group/FOX/master/input/Wikiner/aij-wikiner-en-wp2.bz2"
+  - dest: 'assets/${vars.hr500k-archive}'
+    url: '${vars.hr500k-url}'
 
 workflows:
   all:
@@ -32,18 +36,17 @@ commands:
       - "python -m spacy init config --lang en --pipeline ner --optimize efficiency -C configs/${vars.config}.cfg"
 
   - name: corpus
-    help: "Convert the data to spaCy's format"
-    # Make sure we specify the branch in the command string, so that the
-    # caching works correctly.
-    script:
-      - "python scripts/partition.py assets/aij-wikiner-en-wp2.bz2 assets/iob"
-      - "python -m spacy convert assets/iob corpus --n-sents 10"
+    help: 'Extract the corpus file and create train/test/dev in spacy format'
     deps:
-      - "assets/aij-wikiner-en-wp2.bz2"
+      - 'assets/${vars.hr500k-archive}'
     outputs:
-      - "corpus/train.spacy"
-      - "corpus/dev.spacy"
-      - "corpus/test.spacy"
+      - 'corpus/train.spacy'
+      - 'corpus/dev.spacy'
+      - 'corpus/test.spacy'
+    script:
+      - "./unzip-corpus.sh assets/${vars.hr500k-archive} ${vars.hr500k-file} assets/hr500k.conll"
+      - "python scripts/prepare_hr500k.py assets/hr500k.conll corpus"
+      - "rm assets/hr500k.conll"
 
   - name: train
     help: "Train the full pipeline"
