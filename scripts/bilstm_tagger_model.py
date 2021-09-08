@@ -5,9 +5,10 @@ Implements neural model of the BiLSTM sequence tagger component.
 import spacy
 from typing import List
 
-from thinc.api import Model, chain, TensorFlowWrapper, PyTorchLSTM
+from thinc.api import Model, chain, TensorFlowWrapper, PyTorchLSTM, LSTM
 from thinc.layers import list2padded, list2array, with_padded, Softmax, with_list, with_debug
 from thinc.api import strings2arrays, with_array
+from thinc.initializers import normal_init
 
 from spacy.ml import CharacterEmbed
 from spacy.tokens import Doc
@@ -68,16 +69,17 @@ def thinc_bilstm_torch(tok2vec: Model[List[Doc], List[Floats2d]], num_labels: in
     Create a BiLSTM model based on pyTorch implementation
     :return:
     '''
-    #TODO: init weights, for Softmax?, for LSTM?
-    bilstm = PyTorchLSTM(nO=lstm_width, nI=emb_width, bi=True, depth=num_layers)
-    classification = Softmax(nO=num_labels, nI=lstm_width)
+    from thinc.initializers import glorot_uniform_init
+    bilstm = PyTorchLSTM(nO=lstm_width, nI=emb_width, bi=True, depth=num_layers, dropout=0.1)
+    #bilstm = LSTM(nO=lstm_width, nI=emb_width, bi=True, depth=num_layers)
+    classification = Softmax(nO=num_labels, nI=lstm_width, init_W=normal_init)
     if debug:
         model = chain(with_debug(tok2vec, on_forward=model_debug_fw),
                   with_debug(bilstm, on_forward=model_debug_fw),
                   with_debug(with_array(classification), on_forward=model_debug_fw))
     else:
-        model = chain(tok2vec, bilstm, with_array(classification), list2array())
-        #model = chain(tok2vec, bilstm, classification)
+        model = chain(tok2vec, bilstm, with_array(classification), list2array()) # PyTorchLSTM
+        #model = chain(tok2vec, with_padded(bilstm), with_array(classification), list2array()) # LSTM
     return model
 
 if __name__ == '__main__':

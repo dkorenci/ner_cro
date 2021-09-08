@@ -91,6 +91,7 @@ class BilstmTagger(TrainablePipe):
         loss_calc = CategoricalCrossentropy()
         truth = self._examples_to_ner_labels(examples, debug=False)
         grad, loss = loss_calc(scores, truth)
+        #L.info(f'grad.max: {np.max(grad)}')
         return float(loss), grad
 
     def _examples_to_ner_labels(self, examples: List[Example], debug:bool = False) \
