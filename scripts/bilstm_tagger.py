@@ -4,6 +4,7 @@ Implements BiLSTM sequence tagger as spaCy pipeline component.
 
 from typing import Tuple, List, Iterable, Optional, Dict, Callable, Any
 import numpy as np
+import sys
 
 from spacy.pipeline import TrainablePipe
 from spacy.language import Language
@@ -31,12 +32,37 @@ class BilstmTagger(TrainablePipe):
         self.vocab = vocab
         self.model = model
         self.name = name
-        self.cfg = cfg
-        self.cfg['labels'] = []
+        self.cfg = dict(cfg)
 
     @property
     def labels(self) -> Tuple[str]:
-        return tuple(self.cfg["labels"])
+        if 'labels' in self.cfg:
+            return tuple(self.cfg["labels"])
+        else: return tuple([])
+
+    @property
+    def label2index(self) -> Dict[str, int]: return self.cfg["label2index"]
+
+    @property
+    def index2label(self) -> Dict[int, str]:
+        self._check_index2label()
+        return self.cfg["index2label"]
+
+    def _check_index2label(self):
+        '''
+        Spacy serialization turns key in self.index2label map to strings.
+        This is a workaround around this, it turns keys back to ints.
+        '''
+        if hasattr(self, '_i2l_checked') and self._i2l_checked: return
+        correct = False
+        for k, v in self.cfg['index2label'].items():
+            if isinstance(k, str):
+                correct = True
+                break
+        if correct:
+            new_i2l = { int(k):v for k, v in self.cfg['index2label'].items() }
+            self.cfg['index2label'] = new_i2l
+        self._i2l_checked = True
 
     def initialize(self, get_examples: Callable[[], Iterable[Example]], *,
             nlp: Language = None, labels: Optional[List[str]] = None):
@@ -47,14 +73,12 @@ class BilstmTagger(TrainablePipe):
         for i, ex in enumerate(get_examples()):
             #add_iob_labels(ex.reference, labels)
             add_ner_labels(ex, labels)
-        self._labels = labels
-        self._label_map, self._inv_label_map = create_label_mappings(labels)
-        L.info(self._labels)
-        L.info(self._label_map)
+        self.cfg = {}
+        self.cfg['labels'] = list(labels)
+        self.cfg['label2index'], self.cfg['index2label'] = create_label_mappings(labels)
         sample = list(islice(get_examples(), 10))
         docsample = [ex.reference for ex in sample]
-        labels = self._examples_to_ner_labels(sample)
-        self.model.initialize(X=docsample, Y=labels)
+        self.model.initialize(X=docsample, Y=self._examples_to_ner_labels(sample))
 
     def predict(self, docs: Iterable[Doc]) -> Floats2d:
         scores = self.model.predict(docs)
@@ -69,7 +93,7 @@ class BilstmTagger(TrainablePipe):
             for tok in doc:
                 ner_tag_probs = scores[ti]; ti += 1
                 maxi = np.argmax(ner_tag_probs)
-                ner_label = self._inv_label_map[maxi]
+                ner_label = self.index2label[maxi]
                 biluo_tags.append(ner_label)
             try:
                 spans = biluo_tags_to_spans(doc, biluo_tags)
@@ -115,9 +139,9 @@ class BilstmTagger(TrainablePipe):
             L.info('aligned ner:')
             L.info(aner)
         # without explicitly setting dtype="float32", there is a type mismatch error
-        labels = np.zeros((len(aner), len(self._labels)), dtype="float32")
+        labels = np.zeros((len(aner), len(self.labels)), dtype="float32")
         for i, nerLabel in enumerate(ex.get_aligned_ner()):
-            labels[i, self._label_map[nerLabel]] = 1.0
+            labels[i, self.label2index[nerLabel]] = 1.0
         return labels
 
     def _document_ner_labels(self, doc:Doc, debug:bool = False) -> Optional[np.ndarray]:
@@ -125,7 +149,7 @@ class BilstmTagger(TrainablePipe):
         Convert a document with NER annotations into a matrix of one-hot per-token labels
         '''
         if debug: print_doc_info(doc)
-        labels = np.zeros((len(doc), len(self._labels)), float)
+        labels = np.zeros((len(doc), len(self.labels)), float)
         for i, tok in enumerate(doc):
-            labels[i, self._label_map[token_iob_label(tok)]] = 1.0
+            labels[i, self.label2index[token_iob_label(tok)]] = 1.0
         return labels

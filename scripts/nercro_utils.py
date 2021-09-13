@@ -37,7 +37,7 @@ def create_label_mappings(labels):
     Index ner labels by lexicographically sorting them,
      return label->index and index->label maps
     :param labels: set of IOB labels
-    :return: map label -> integer index
+    :return: map label -> integer index, map index -> label
     '''
     slabels = sorted(labels)
     l2i = {l:i for i, l in enumerate(slabels)}
