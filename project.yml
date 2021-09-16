@@ -62,7 +62,7 @@ commands:
   - name: evaluate
     help: "Evaluate on the test data and save the metrics"
     script:
-      - "python -m spacy evaluate ./training/model-best ./corpus/test.spacy --output ./metrics/${vars.config}.json --gpu-id ${vars.gpu}"
+      - "python -m spacy evaluate ./training/model-best ./corpus/test.spacy --output ./metrics/${vars.config}.json --gpu-id ${vars.gpu} -c ./scripts/factory_methods.py"
     deps:
       - "training/model-best"
       - "corpus/test.spacy"
