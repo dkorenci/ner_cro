@@ -3,7 +3,7 @@ description: "Simple example of downloading and converting source data and train
 
 # Variables can be referenced across the project.yml using ${vars.var_name}
 vars:
-  config: "default-bilstm"
+  config: "transformer"
   # if the url does not work, replace it with the new url of hr500k.conll.zip from:
   # https://www.clarin.si/repository/xmlui/handle/11356/1183
   hr500k-url: 'https://www.clarin.si/repository/xmlui/bitstream/handle/11356/1183/hr500k.conll.zip?sequence=6&isAllowed=y'
